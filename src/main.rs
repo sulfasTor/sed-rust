@@ -16,8 +16,51 @@ fn version() {
     print!("{}", VERSION);
 }
 
-fn parse_script(s: &str) -> &str {
-    s
+struct ScriptCommands {
+    addr: String,
+    sed_cmd: String,
+    options: String,
+}
+
+fn parse_script(s: &str) -> Result<ScriptCommands, String> {
+    // See https://www.gnu.org/software/sed/manual/sed.html#Introduction
+    // TODO: Implement regex addresses
+    let mut addr = String::new();
+    let mut sed_cmd = String::new();
+    let mut options = String::new();
+
+    println!("{s}");
+    let s = s.chars().into_iter().peekable().enumerate();
+    while let Some((i, c)) = s.next() {
+        if c.is_numeric() {
+            addr.push(c);
+            continue
+        }
+        if c == ',' {
+            addr.push(c);
+            continue
+        }
+        break
+    }
+    sed_cmd = s.next().map(|(i, c)| {
+        if !c.is_numeric() {
+            return Err(format!("sed: -e char {}: unknown command: {}", i, c))
+        }
+        Ok(c.to_string())
+    }).unwrap()?;
+
+    println!("ADDR: {}", addr);
+    println!("X: {}", sed_cmd);
+    println!("OPTIONS: {}", options);
+    Ok(ScriptCommands {
+        addr,
+        sed_cmd,
+        options,
+    })
+}
+
+fn eval_script(cmd: ScriptCommands, fb: &FilesBuffer) -> Result<(), String> {
+    Ok(())
 }
 
 struct FilesBuffer {
@@ -43,7 +86,14 @@ fn handle_script(script: &str, files: Option<&[String]>) {
         }
     };
     let cmd = parse_script(script);
-    println!("{}", cmd);
+    let res = eval_script(
+        cmd.unwrap_or_else(|err| {
+            eprint!("{}", err);
+            process::exit(1);
+        }),
+        &fb,
+    );
+    println!("{:?}", res.unwrap());
     println!("{:?}", fb.files)
 }
 
@@ -69,7 +119,7 @@ fn handle_args() {
         help();
         process::exit(1);
     }
-    handle_script(pos.last().unwrap(), pos.get(1..));
+    handle_script(pos.first().unwrap(), pos.get(1..));
 }
 
 fn main() {
