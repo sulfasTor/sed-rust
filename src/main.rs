@@ -1,4 +1,6 @@
 use std::env::args;
+use std::fs::read_to_string;
+use std::process;
 
 const VERSION: &str = "0.0.1";
 
@@ -13,15 +15,19 @@ fn version() {
     println!("{}", VERSION);
 }
 
-fn open_file(f: &str) -> &str {
-  f
-}
-
 fn parse_script(s: &str) -> &str {
     s
 }
 
-fn handle() {
+fn handle_script(path: &str, script: &str) {
+    let file = read_to_string(path).unwrap_or_else(|err| {
+      eprintln!("{}: {}", path, err);
+      process::exit(1);
+    });
+    println!("{}", file)
+}
+
+fn handle_args() {
     let args = args();
     let mut pos: Vec<String> = vec![];
 
@@ -38,9 +44,9 @@ fn handle() {
             _ => pos.push(arg),
         }
     }
-    println!("{:?}", pos)
+    handle_script(pos.last().unwrap(), pos.first().unwrap());
 }
 
 fn main() {
-    handle()
+    handle_args()
 }
