@@ -1,0 +1,14 @@
+#+TITLE: README
+
+* sed-rust [WIP]
+Simple sed implementation in rust, no external crates
+
+* Usage
+#+begin_center
+cargo build --release
+#+end_center
+
+#+begin_center
+$ sed-rust -h
+Usage: sed-rust [help h] [version v]... {script-only-if-no-other-script} [input-file]...
+#+end_center
