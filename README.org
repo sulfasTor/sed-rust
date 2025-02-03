@@ -4,11 +4,11 @@
 Simple sed implementation in rust, no external crates
 
 * Usage
-#+begin_center
+#+begin_example
 cargo build --release
-#+end_center
+#+end_example
 
-#+begin_center
+#+begin_example
 $ sed-rust -h
 Usage: sed-rust [help h] [version v]... {script-only-if-no-other-script} [input-file]...
-#+end_center
+#+end_example
