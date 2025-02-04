@@ -16,53 +16,94 @@ fn version() {
     print!("{}", VERSION);
 }
 
+#[derive(Debug)]
 struct ScriptCommands {
-    addr: String,
+    addr: (i32, i32),
     sed_cmd: String,
-    options: String,
+    options: Vec<String>,
 }
 
 fn parse_script(s: &str) -> Result<ScriptCommands, String> {
     // See https://www.gnu.org/software/sed/manual/sed.html#Introduction
     // TODO: Implement regex addresses
-    let mut addr = String::new();
+    let mut range: (i32, i32) = (-1, -1);
     let mut sed_cmd = String::new();
-    let mut options = String::new();
+    let mut cmd_separator = String::new();
+    let mut options: Vec<String> = vec![];
 
     println!("{s}");
-    let s = s.chars().into_iter().peekable().enumerate();
+    let mut s = s.chars().enumerate();
+    let mut range_str = String::new();
+    let mut options_str = String::new();
     while let Some((i, c)) = s.next() {
-        if c.is_numeric() {
-            addr.push(c);
-            continue
-        }
-        if c == ',' {
-            addr.push(c);
-            continue
-        }
-        break
-    }
-    sed_cmd = s.next().map(|(i, c)| {
-        if !c.is_numeric() {
-            return Err(format!("sed: -e char {}: unknown command: {}", i, c))
-        }
-        Ok(c.to_string())
-    }).unwrap()?;
+        match c {
+            ',' => {
+                range.0 = range_str
+                    .parse()
+                    .map_err(|_| format!("sed: -e char {}: unknown command: {}", i + 1, c))?;
+                range_str = String::new();
+            }
+            '0'..='9' => range_str.push(c),
+            //Valid sed script command
+            'a' | 's' => {
+                range.1 = range_str.parse().unwrap_or(-1);
+                sed_cmd = c.to_string();
+                break;
+            }
+            _ => {
+                if sed_cmd.is_empty() {
+                    return Err(format!("sed: -e char {}: unknown command: {}", i + 1, c));
+                }
+                if cmd_separator.is_empty() {
+                    cmd_separator = c.to_string();
+                    continue;
+                }
 
-    println!("ADDR: {}", addr);
+                if c.to_string() == cmd_separator {
+                    if !validate_option(&sed_cmd, &options) {
+                        return Err(format!(
+                            "sed: -e char {}: unknown option to {}: {}",
+                            i + 1,
+                            sed_cmd,
+                            c
+                        ));
+                    }
+                    options.push(options_str.clone());
+                    continue;
+                }
+                options_str.push(c);
+            }
+        }
+    }
+
+    println!("ADDR: {:?}", range);
     println!("X: {}", sed_cmd);
-    println!("OPTIONS: {}", options);
+    println!("OPTIONS: {:?}", options);
     Ok(ScriptCommands {
-        addr,
+        addr: range,
         sed_cmd,
         options,
     })
 }
 
-fn eval_script(cmd: ScriptCommands, fb: &FilesBuffer) -> Result<(), String> {
-    Ok(())
+fn validate_option(cmd: &str, options: &[String]) -> bool {
+    match cmd {
+        "s" => {
+            if options.len() > 3 {
+                return false;
+            }
+            return true;
+        }
+        _ => return false,
+    }
 }
 
+fn eval_script(cmd: ScriptCommands, fb: &FilesBuffer) -> Result<(), String> {
+    println!("{:?}", cmd);
+    println!("{:?}", fb);
+    Ok(())
+}
+#[derive(Debug)]
 struct FilesBuffer {
     files: Vec<String>,
 }
