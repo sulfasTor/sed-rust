@@ -28,27 +28,28 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
     // TODO: Implement regex addresses
     let mut range: (i32, i32) = (-1, -1);
     let mut sed_cmd = String::new();
-    let mut cmd_separator = String::new();
     let mut options: Vec<String> = vec![];
+
     let mut s = s.chars().enumerate();
-    let mut range_str = String::new();
-    let mut options_str = String::new();
+    let mut temp_str = String::new();
+    let mut cmd_separator = String::new();
     while let Some((i, c)) = s.next() {
         match c {
             ',' => {
-                range.0 = range_str
+                range.0 = temp_str
                     .parse()
                     .map_err(|_| format!("sed: -e char {}: unknown command: {}", i + 1, c))?;
-                range_str = String::new();
+                temp_str = String::new();
             }
-            '0'..='9' => range_str.push(c),
+            '0'..='9' => temp_str.push(c),
             //Valid sed script command
             'a' | 's' => {
                 if !sed_cmd.is_empty() {
-                    options_str.push(c);
+                    temp_str.push(c);
                     continue;
                 }
-                range.1 = range_str.parse().unwrap_or(-1);
+                range.1 = temp_str.parse().unwrap_or(-1);
+                temp_str = String::new();
                 sed_cmd = c.to_string();
             }
             _ => {
@@ -69,11 +70,11 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
                             sed_cmd
                         ));
                     }
-                    options.push(options_str.clone());
-                    options_str = String::new();
+                    options.push(temp_str.clone());
+                    temp_str = String::new();
                     continue;
                 }
-                options_str.push(c);
+                temp_str.push(c);
             }
         }
     }
