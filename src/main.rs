@@ -30,8 +30,6 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
     let mut sed_cmd = String::new();
     let mut cmd_separator = String::new();
     let mut options: Vec<String> = vec![];
-
-    println!("{s}");
     let mut s = s.chars().enumerate();
     let mut range_str = String::new();
     let mut options_str = String::new();
@@ -46,9 +44,12 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
             '0'..='9' => range_str.push(c),
             //Valid sed script command
             'a' | 's' => {
+                if !sed_cmd.is_empty() {
+                    options_str.push(c);
+                    continue;
+                }
                 range.1 = range_str.parse().unwrap_or(-1);
                 sed_cmd = c.to_string();
-                break;
             }
             _ => {
                 if sed_cmd.is_empty() {
@@ -60,15 +61,15 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
                 }
 
                 if c.to_string() == cmd_separator {
-                    if !validate_option(&sed_cmd, &options) {
+                    if !validate_options(&sed_cmd, &options) {
                         return Err(format!(
-                            "sed: -e char {}: unknown option to {}: {}",
+                            "sed: -e char {}: unknown option to {}",
                             i + 1,
-                            sed_cmd,
-                            c
+                            sed_cmd
                         ));
                     }
                     options.push(options_str.clone());
+                    options_str = String::new();
                     continue;
                 }
                 options_str.push(c);
@@ -76,9 +77,6 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
         }
     }
 
-    println!("ADDR: {:?}", range);
-    println!("X: {}", sed_cmd);
-    println!("OPTIONS: {:?}", options);
     Ok(ScriptCommands {
         addr: range,
         sed_cmd,
@@ -86,10 +84,10 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
     })
 }
 
-fn validate_option(cmd: &str, options: &[String]) -> bool {
+fn validate_options(cmd: &str, options: &[String]) -> bool {
     match cmd {
         "s" => {
-            if options.len() > 3 {
+            if options.len() +1 > 2 {
                 return false;
             }
             return true;
@@ -127,15 +125,13 @@ fn handle_script(script: &str, files: Option<&[String]>) {
         }
     };
     let cmd = parse_script(script);
-    let res = eval_script(
+    let _res = eval_script(
         cmd.unwrap_or_else(|err| {
             eprint!("{}", err);
             process::exit(1);
         }),
         &fb,
     );
-    println!("{:?}", res.unwrap());
-    println!("{:?}", fb.files)
 }
 
 fn handle_args() {
