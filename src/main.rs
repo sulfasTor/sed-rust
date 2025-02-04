@@ -87,13 +87,8 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
 
 fn validate_options(cmd: &str, options: &[String]) -> bool {
     match cmd {
-        "s" => {
-            if options.len() + 1 > 2 {
-                return false;
-            }
-            return true;
-        }
-        _ => return false,
+        "s" => options.len() + 1 < 3,
+        _ => false,
     }
 }
 
