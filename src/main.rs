@@ -28,27 +28,28 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
     // TODO: Implement regex addresses
     let mut range: (i32, i32) = (-1, -1);
     let mut sed_cmd = String::new();
-    let mut cmd_separator = String::new();
     let mut options: Vec<String> = vec![];
+
     let mut s = s.chars().enumerate();
-    let mut range_str = String::new();
-    let mut options_str = String::new();
+    let mut temp_str = String::new();
+    let mut cmd_separator = String::new();
     while let Some((i, c)) = s.next() {
         match c {
             ',' => {
-                range.0 = range_str
+                range.0 = temp_str
                     .parse()
                     .map_err(|_| format!("sed: -e char {}: unknown command: {}", i + 1, c))?;
-                range_str = String::new();
+                temp_str = String::new();
             }
-            '0'..='9' => range_str.push(c),
+            '0'..='9' => temp_str.push(c),
             //Valid sed script command
             'a' | 's' => {
                 if !sed_cmd.is_empty() {
-                    options_str.push(c);
+                    temp_str.push(c);
                     continue;
                 }
-                range.1 = range_str.parse().unwrap_or(-1);
+                range.1 = temp_str.parse().unwrap_or(-1);
+                temp_str = String::new();
                 sed_cmd = c.to_string();
             }
             _ => {
@@ -61,6 +62,7 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
                 }
 
                 if c.to_string() == cmd_separator {
+                    // todo: Parse command flags
                     if !validate_options(&sed_cmd, &options) {
                         return Err(format!(
                             "sed: -e char {}: unknown option to {}",
@@ -68,11 +70,11 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
                             sed_cmd
                         ));
                     }
-                    options.push(options_str.clone());
-                    options_str = String::new();
+                    options.push(temp_str.clone());
+                    temp_str = String::new();
                     continue;
                 }
-                options_str.push(c);
+                temp_str.push(c);
             }
         }
     }
@@ -86,21 +88,33 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
 
 fn validate_options(cmd: &str, options: &[String]) -> bool {
     match cmd {
-        "s" => {
-            if options.len() +1 > 2 {
-                return false;
-            }
-            return true;
-        }
-        _ => return false,
+        "s" => options.len() + 1 < 3,
+        _ => false,
     }
 }
 
 fn eval_script(cmd: ScriptCommands, fb: &FilesBuffer) -> Result<(), String> {
-    println!("{:?}", cmd);
-    println!("{:?}", fb);
+    match cmd.sed_cmd.as_str() {
+        "s" => {
+            let (start, end) = cmd.addr;
+            for f in &fb.files {
+                for (i, l) in f.lines().enumerate() {
+                    if i >= start as usize && i <= end as usize {
+                        println!(
+                            "{}",
+                            l.replace(cmd.options.get(0).unwrap(), cmd.options.get(1).unwrap())
+                        );
+                        continue;
+                    }
+                    println!("{}", l)
+                }
+            }
+        }
+        _ => {}
+    }
     Ok(())
 }
+
 #[derive(Debug)]
 struct FilesBuffer {
     files: Vec<String>,
