@@ -100,18 +100,17 @@ fn validate_options(cmd: &str, options: &[String]) -> bool {
 fn eval_script(cmd: ScriptCommands, fb: &FilesBuffer) -> Result<(), String> {
     match cmd.sed_cmd.as_str() {
         "s" => {
-            if let (start, end) = cmd.addr {
-                for f in &fb.files {
-                    for (i, l) in f.lines().enumerate() {
-                        if i >= start as usize && i <= end as usize {
-                            println!(
-                                "{}",
-                                l.replace(cmd.options.get(0).unwrap(), cmd.options.get(1).unwrap())
-                            );
-                            continue;
-                        }
-                        println!("{}", l)
+            let (start, end) = cmd.addr;
+            for f in &fb.files {
+                for (i, l) in f.lines().enumerate() {
+                    if i >= start as usize && i <= end as usize {
+                        println!(
+                            "{}",
+                            l.replace(cmd.options.get(0).unwrap(), cmd.options.get(1).unwrap())
+                        );
+                        continue;
                     }
+                    println!("{}", l)
                 }
             }
         }
@@ -119,6 +118,7 @@ fn eval_script(cmd: ScriptCommands, fb: &FilesBuffer) -> Result<(), String> {
     }
     Ok(())
 }
+
 #[derive(Debug)]
 struct FilesBuffer {
     files: Vec<String>,
