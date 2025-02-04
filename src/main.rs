@@ -61,6 +61,7 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
                 }
 
                 if c.to_string() == cmd_separator {
+                    // todo: Parse command flags
                     if !validate_options(&sed_cmd, &options) {
                         return Err(format!(
                             "sed: -e char {}: unknown option to {}",
@@ -87,7 +88,7 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
 fn validate_options(cmd: &str, options: &[String]) -> bool {
     match cmd {
         "s" => {
-            if options.len() +1 > 2 {
+            if options.len() + 1 > 2 {
                 return false;
             }
             return true;
@@ -97,8 +98,25 @@ fn validate_options(cmd: &str, options: &[String]) -> bool {
 }
 
 fn eval_script(cmd: ScriptCommands, fb: &FilesBuffer) -> Result<(), String> {
-    println!("{:?}", cmd);
-    println!("{:?}", fb);
+    match cmd.sed_cmd.as_str() {
+        "s" => {
+            if let (start, end) = cmd.addr {
+                for f in &fb.files {
+                    for (i, l) in f.lines().enumerate() {
+                        if i >= start as usize && i <= end as usize {
+                            println!(
+                                "{}",
+                                l.replace(cmd.options.get(0).unwrap(), cmd.options.get(1).unwrap())
+                            );
+                            continue;
+                        }
+                        println!("{}", l)
+                    }
+                }
+            }
+        }
+        _ => {}
+    }
     Ok(())
 }
 #[derive(Debug)]
