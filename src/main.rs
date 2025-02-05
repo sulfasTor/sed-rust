@@ -1,3 +1,4 @@
+use std::char;
 use std::env::args;
 use std::fs;
 use std::io;
@@ -19,59 +20,82 @@ fn version() {
 #[derive(Debug)]
 struct ScriptCommands {
     addr: (i32, i32),
-    sed_cmd: String,
+    cmd: String,
+    flag: String,
     options: Vec<String>,
 }
 
 fn parse_script(s: &str) -> Result<ScriptCommands, String> {
     // See https://www.gnu.org/software/sed/manual/sed.html#Introduction
     // TODO: Implement regex addresses
-    let mut range: (i32, i32) = (-1, -1);
-    let mut sed_cmd = String::new();
+    // TODO: Error out if addr is 0: invalid usage of line address 0
+    let mut addr: (i32, i32) = (0, 0);
+    let mut cmd = String::new();
+    let mut flag = String::new();
     let mut options: Vec<String> = vec![];
 
+    let cmd_len = s.len();
     let mut s = s.chars().enumerate();
     let mut temp_str = String::new();
-    let mut cmd_separator = String::new();
+    let mut cmd_separator: Option<char> = None;
     while let Some((i, c)) = s.next() {
         match c {
             ',' => {
-                range.0 = temp_str
-                    .parse()
-                    .map_err(|_| format!("sed: -e char {}: unknown command: {}", i + 1, c))?;
+                if cmd.is_empty() {
+                    addr.0 = temp_str.parse().map_err(|_| {
+                        format!(
+                            "sed: -e expression #1, char {}: unknown command: `{}'",
+                            i + 1,
+                            c
+                        )
+                    })?;
+                }
                 temp_str = String::new();
             }
             '0'..='9' => temp_str.push(c),
-            //Valid sed script command
-            'a' | 's' => {
-                if !sed_cmd.is_empty() {
+            's' => {
+                if !cmd.is_empty() {
                     temp_str.push(c);
                     continue;
                 }
-                range.1 = temp_str.parse().unwrap_or(-1);
+                addr.1 = temp_str.parse().unwrap_or(0);
                 temp_str = String::new();
-                sed_cmd = c.to_string();
+                cmd = c.to_string();
+            }
+            _ if cmd.is_empty() => {
+                return Err(format!(
+                    "sed: -e expression #1, char {}: unknown command: `{}'",
+                    i + 1,
+                    c
+                ));
+            }
+            _ if valid_options(&cmd, &options) => {
+                if !valid_option_flag(&cmd, &c) {
+                    return Err(format!(
+                        "sed: -e expression #1, char {}: unknown option to `{}'",
+                        i + 1,
+                        cmd
+                    ));
+                }
+                flag.push(c);
+            }
+            _ if Some(c) == cmd_separator => {
+                options.push(temp_str.clone());
+                temp_str = String::new();
+            }
+            _ if i == cmd_len - 1 => {
+                if !valid_options(&cmd, &options) {
+                    println!("OPTIONS: {:?} {}", &options, &cmd);
+                    return Err(format!(
+                        "sed: -e expression #1, char {}: unterminated `{}' command",
+                        i + 1,
+                        cmd
+                    ));
+                }
             }
             _ => {
-                if sed_cmd.is_empty() {
-                    return Err(format!("sed: -e char {}: unknown command: {}", i + 1, c));
-                }
-                if cmd_separator.is_empty() {
-                    cmd_separator = c.to_string();
-                    continue;
-                }
-
-                if c.to_string() == cmd_separator {
-                    // todo: Parse command flags
-                    if !validate_options(&sed_cmd, &options) {
-                        return Err(format!(
-                            "sed: -e char {}: unknown option to {}",
-                            i + 1,
-                            sed_cmd
-                        ));
-                    }
-                    options.push(temp_str.clone());
-                    temp_str = String::new();
+                if cmd_separator.is_none() {
+                    cmd_separator = Some(c);
                     continue;
                 }
                 temp_str.push(c);
@@ -80,36 +104,59 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
     }
 
     Ok(ScriptCommands {
-        addr: range,
-        sed_cmd,
+        addr,
+        cmd,
+        flag,
         options,
     })
 }
 
-fn validate_options(cmd: &str, options: &[String]) -> bool {
+fn valid_options(cmd: &str, options: &[String]) -> bool {
     match cmd {
-        "s" => options.len() + 1 < 3,
+        "s" => options.len() == 2,
         _ => false,
     }
 }
 
-fn eval_script(cmd: ScriptCommands, fb: &FilesBuffer) -> Result<(), String> {
-    match cmd.sed_cmd.as_str() {
-        "s" => {
-            let (start, end) = cmd.addr;
-            for f in &fb.files {
-                for (i, l) in f.lines().enumerate() {
-                    if i >= start as usize && i <= end as usize {
-                        println!(
-                            "{}",
-                            l.replace(cmd.options.get(0).unwrap(), cmd.options.get(1).unwrap())
-                        );
-                        continue;
-                    }
-                    println!("{}", l)
-                }
+fn valid_option_flag(cmd: &str, flag: &char) -> bool {
+    match cmd {
+        "s" => *flag == 'g',
+        _ => false,
+    }
+}
+
+fn eval_s_command(cmd: &ScriptCommands, buffer: &str) -> Result<(), String> {
+    let (start, end) = cmd.addr;
+    for (i, l) in buffer.lines().enumerate() {
+        let should_replace = match (start, end) {
+            (0, 0) => true,                    // Replace all lines
+            (0, end) => i + 1 == end as usize, // Replace only at end
+            (start, end) if start >= end => i + 1 == start as usize,
+            (start, end) => i + 1 >= start as usize && i + 1 <= end as usize,
+        };
+        let new_line = if should_replace {
+            match cmd.flag.as_str() {
+                "g" => l
+                    .to_string()
+                    .replace(cmd.options.get(0).unwrap(), cmd.options.get(1).unwrap()),
+                _ => l.to_string().replacen(
+                    cmd.options.get(0).unwrap(),
+                    cmd.options.get(1).unwrap(),
+                    1,
+                ),
             }
-        }
+        } else {
+            l.to_string()
+        };
+        println!("{}", new_line)
+    }
+    Ok(())
+}
+
+fn eval_script(cmd: ScriptCommands, fb: &FilesBuffer) -> Result<(), String> {
+    let buffer = fb.files.join("\n").to_string();
+    match cmd.cmd.as_str() {
+        "s" => eval_s_command(&cmd, &buffer)?,
         _ => {}
     }
     Ok(())
@@ -139,13 +186,15 @@ fn handle_script(script: &str, files: Option<&[String]>) {
         }
     };
     let cmd = parse_script(script);
-    let _res = eval_script(
+    println!("{:?}", cmd);
+    eval_script(
         cmd.unwrap_or_else(|err| {
             eprint!("{}", err);
             process::exit(1);
         }),
         &fb,
-    );
+    )
+    .unwrap();
 }
 
 fn handle_args() {
