@@ -17,5 +17,6 @@ jobs:
     needs: [check]
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: 'Smoke test'
-        run: ./test.sh    
+        run: ./test.sh

@@ -1,6 +1,5 @@
 #!/bin/bash
 
-# Define input as a variable
 INPUT="foo
 baz
 foofoo"
