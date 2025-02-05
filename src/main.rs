@@ -2,14 +2,14 @@ use std::char;
 use std::env::args;
 use std::fs;
 use std::io;
+use std::io::Read;
 use std::process;
 
 const VERSION: &str = "0.0.1";
 
 fn help() {
-    let usage = "
-Usage: sed-rust [help h] [version v]... {script-only-if-no-other-script} [input-file]...
-";
+    let usage =
+        "Usage: sed-rust [help h] [version v]... {script-only-if-no-other-script} [input-file]...";
     print!("{usage}");
 }
 
@@ -169,7 +169,8 @@ struct FilesBuffer {
 fn handle_script(script: &str, files: Option<&[String]>) {
     let fb = match files {
         Some([]) | None => {
-            let buf = io::read_to_string(io::stdin()).unwrap();
+            let mut buf = String::new();
+            io::stdin().read_to_string(&mut buf).unwrap();
             FilesBuffer { files: vec![buf] }
         }
         Some(files) => {
@@ -196,10 +197,12 @@ fn handle_script(script: &str, files: Option<&[String]>) {
 }
 
 fn handle_args() {
-    let args = args();
-    let mut pos: Vec<String> = vec![];
-
-    for arg in args.skip(1) {
+    let args: Vec<String> = args().skip(1).collect();
+    if args.is_empty() {
+        help();
+        process::exit(0);
+    }
+    for arg in &args {
         match arg.as_str() {
             "--help" | "-h" => {
                 help();
@@ -209,15 +212,10 @@ fn handle_args() {
                 version();
                 process::exit(0);
             }
-            _ => pos.push(arg),
+            _ => continue,
         }
     }
-    if pos.len() == 0 {
-        eprint!("Missing script positional argument");
-        help();
-        process::exit(1);
-    }
-    handle_script(pos.first().unwrap(), pos.get(1..));
+    handle_script(&args[0], args.get(1..));
 }
 
 fn main() {
