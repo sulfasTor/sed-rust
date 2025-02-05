@@ -85,7 +85,6 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
             }
             _ if i == cmd_len - 1 => {
                 if !valid_options(&cmd, &options) {
-                    println!("OPTIONS: {:?} {}", &options, &cmd);
                     return Err(format!(
                         "sed: -e expression #1, char {}: unterminated `{}' command",
                         i + 1,
@@ -186,7 +185,6 @@ fn handle_script(script: &str, files: Option<&[String]>) {
         }
     };
     let cmd = parse_script(script);
-    println!("{:?}", cmd);
     eval_script(
         cmd.unwrap_or_else(|err| {
             eprint!("{}", err);
