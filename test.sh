@@ -7,11 +7,14 @@ foofoo"
 SED_RUST="./target/release/sed-rust"
 
 TEST_CASES=(
-    "s/foo/bar/"    # Replace first occurrence per line
-    "s/foo/bar/g"   # Replace all occurrences per line
-    "2,3s/foo/bar/" # Replace on lines 2 to 3
-    "1,2s/foo/bar/" # Replace only at line 2
-    "3,2s/foo/bar/" # Replace only the highest line (max(start, end))
+    "s/foo/bar/"
+    "s/foo/bar/g"
+    "2,3s/foo/bar/"
+    "1,2s/foo/bar/"
+    "3,2s/foo/bar/"
+    "y/foa/123/"
+    "1,2y/abo/098/"
+    "2,4y/a/4/"
 )
 
 exit_code=0
