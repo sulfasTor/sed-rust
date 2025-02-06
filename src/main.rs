@@ -44,7 +44,7 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
                 if cmd.is_empty() {
                     addr.0 = temp_str.parse().map_err(|_| {
                         format!(
-                            "sed: -e expression #1, char {}: unknown command: `{}'",
+                            "sed-rust: -e expression #1, char {}: unknown command: `{}'",
                             i + 1,
                             c
                         )
@@ -64,7 +64,7 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
             }
             _ if cmd.is_empty() => {
                 return Err(format!(
-                    "sed: -e expression #1, char {}: unknown command: `{}'",
+                    "sed-rust: -e expression #1, char {}: unknown command: `{}'",
                     i + 1,
                     c
                 ));
@@ -72,7 +72,7 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
             _ if valid_options(&cmd, &options) => {
                 if !valid_option_flag(&cmd, &c) {
                     return Err(format!(
-                        "sed: -e expression #1, char {}: unknown option to `{}'",
+                        "sed-rust: -e expression #1, char {}: unknown option to `{}'",
                         i + 1,
                         cmd
                     ));
@@ -86,7 +86,7 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
             _ if i == cmd_len - 1 => {
                 if !valid_options(&cmd, &options) {
                     return Err(format!(
-                        "sed: -e expression #1, char {}: unterminated `{}' command",
+                        "sed-rust: -e expression #1, char {}: unterminated `{}' command",
                         i + 1,
                         cmd
                     ));
@@ -176,8 +176,8 @@ fn handle_script(script: &str, files: Option<&[String]>) {
         Some(files) => {
             let mut buffers = vec![];
             for f in files {
-                let file = fs::read_to_string(f.to_string()).unwrap_or_else(|err| {
-                    eprintln!("{}: {}", f.to_string(), err);
+                let file = fs::read_to_string(f).unwrap_or_else(|err| {
+                    eprintln!("{}: {}", f, err);
                     process::exit(1);
                 });
                 buffers.push(file);
@@ -211,6 +211,10 @@ fn handle_args() {
             "--version" | "-v" => {
                 version();
                 process::exit(0);
+            }
+            flag if flag.starts_with("--") || flag.starts_with("-") => {
+                help();
+                process::exit(1);
             }
             _ => continue,
         }
