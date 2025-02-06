@@ -1,4 +1,5 @@
 use std::char;
+use std::collections::HashMap;
 use std::env::args;
 use std::fs;
 use std::io;
@@ -53,7 +54,7 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
                 temp_str = String::new();
             }
             '0'..='9' => temp_str.push(c),
-            's' => {
+            's' | 'y' => {
                 if !cmd.is_empty() {
                     temp_str.push(c);
                     continue;
@@ -113,6 +114,7 @@ fn parse_script(s: &str) -> Result<ScriptCommands, String> {
 fn valid_options(cmd: &str, options: &[String]) -> bool {
     match cmd {
         "s" => options.len() == 2,
+        "y" => options.len() == 2 && options[0].len() == options[1].len(),
         _ => false,
     }
 }
@@ -122,6 +124,36 @@ fn valid_option_flag(cmd: &str, flag: &char) -> bool {
         "s" => *flag == 'g',
         _ => false,
     }
+}
+
+fn eval_y_command(cmd: &ScriptCommands, buffer: &str) -> Result<(), String> {
+    let (start, end) = cmd.addr;
+    let tab: HashMap<char, String> = cmd.options[0]
+        .chars()
+        .zip(cmd.options[1].chars())
+        .map(|(k, v)| return (k.to_owned(), v.to_string().to_owned()))
+        .collect();
+
+    for (i, l) in buffer.lines().enumerate() {
+        let should_translit = match (start, end) {
+            (0, 0) => true,                    // Replace all lines
+            (0, end) => i + 1 == end as usize, // Replace only at end
+            (start, end) if start >= end => i + 1 == start as usize,
+            (start, end) => i + 1 >= start as usize && i + 1 <= end as usize,
+        };
+        let new_line: String = if should_translit {
+            l.chars()
+                .map(|c| match tab.get(&c) {
+                    Some(a) => a.chars().nth(0).unwrap(),
+                    None => c,
+                })
+                .collect()
+        } else {
+            l.to_string()
+        };
+        println!("{}", new_line)
+    }
+    Ok(())
 }
 
 fn eval_s_command(cmd: &ScriptCommands, buffer: &str) -> Result<(), String> {
@@ -156,6 +188,7 @@ fn eval_script(cmd: ScriptCommands, fb: &FilesBuffer) -> Result<(), String> {
     let buffer = fb.files.join("\n").to_string();
     match cmd.cmd.as_str() {
         "s" => eval_s_command(&cmd, &buffer)?,
+        "y" => eval_y_command(&cmd, &buffer)?,
         _ => {}
     }
     Ok(())
